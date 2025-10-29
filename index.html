@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Flow Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;overflow:hidden;background:#000;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;cursor:pointer}
+
+  canvas#gl{position:absolute;inset:0;z-index:1;display:block;pointer-events:auto}
+  canvas#hud{position:absolute;inset:0;z-index:2;pointer-events:none;display:none}
+  #start-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:24px;z-index:3;pointer-events:none;transition:opacity .5s;text-align:center}
+  .hint{position:absolute;left:16px;bottom:16px;z-index:3;color:#bbb;font-size:12px;user-select:none;pointer-events:none;display:none}
+
+  #p5-container{position:fixed;inset:0;z-index:10;display:none;background:#000;opacity:0;transform:scale(.985);
+    transition:opacity .45s ease,transform .45s ease;display:grid;place-items:center}
+  #p5-container.show{opacity:1;transform:scale(1)}
+
+  #choice-ui{position:fixed;inset:0;display:none;place-items:center;z-index:15;background:rgba(0,0,0,.4);backdrop-filter:blur(6px)}
+  #choice-card{min-width:320px;max-width:520px;padding:18px;background:rgba(20,20,20,.85);border:1px solid rgba(255,255,255,.15);
+    border-radius:16px;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.5);cursor:grab}
+  #choice-card h3{margin:0 0 14px 0;font-weight:600;letter-spacing:.2px}
+  .row{display:flex;gap:12px}
+  .btn{flex:1;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#111;color:#fff;font-weight:600;cursor:pointer;text-align:center}
+  .btn:hover{background:#161616}
+  .btn.champ{background:rgba(240,227,196,0.12);border-color:rgba(240,227,196,0.35)}
+
+  #volume-ui{position:fixed;right:16px;top:16px;z-index:20;background:rgba(0,0,0,.6);color:#fff;padding:10px 12px;border-radius:12px;display:none;
+    backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:grab}
+  #volume-ui label{font-size:12px;opacity:.9;margin-right:8px;letter-spacing:.3px}
+  #volume-ui input[type="range"]{width:180px;vertical-align:middle}
+  #volume-ui .val{display:inline-block;width:34px;text-align:right;font-variant-numeric:tabular-nums}
+  #volume-ui button{margin-left:10px;font-size:12px;padding:4px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#111;color:#fff;cursor:pointer}
+
+  #breath-ui{position:fixed;left:50%;transform:translateX(-50%);z-index:25;min-width:280px;max-width:560px;padding:14px 16px;color:#fff;
+    background:rgba(255,245,230,0.07);border:1px solid rgba(255,245,230,0.22);border-radius:14px;backdrop-filter:blur(10px);
+    box-shadow:0 10px 30px rgba(80,60,40,.35);display:none;cursor:grab}
+  #breath-ui .row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  #breath-phase{font-size:12px;letter-spacing:.4px;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:rgba(240,227,196,.18);border:1px solid rgba(240,227,196,.32)}
+  #breath-time{font-size:14px;opacity:.92}
+  #breath-tip{font-size:12px;opacity:.8;letter-spacing:.2px}
+  #breath-progress{height:6px;width:100%;border-radius:999px;overflow:hidden;background:rgba(240,227,196,.18);border:1px solid rgba(240,227,196,.28)}
+  #breath-progress .bar{height:100%;width:0%;background:linear-gradient(90deg,rgba(240,227,196,.95),rgba(201,184,150,.95));border-radius:999px;
+    box-shadow:0 0 14px rgba(240,227,196,.35);transition:width .2s linear}
+
+  #rest-cta{display:none;position:fixed;inset:0;z-index:18;place-items:center;background:rgba(0,0,0,.35);backdrop-filter:blur(6px)}
+  #rest-cta .card{min-width:300px;padding:18px;border-radius:14px;color:#fff;background:rgba(20,20,20,.9);border:1px solid rgba(255,255,255,.18);
+    box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center;cursor:grab}
+  #rest-cta .card h4{margin:0 0 10px 0;font:600 16px Inter,sans-serif}
+  #rest-cta .card button{padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:#111;color:#fff;font:600 14px Inter;cursor:pointer}
+
+  #final-msg{position:fixed;inset:0;display:none;place-items:center;z-index:30;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);pointer-events:none}
+  #final-msg .box{color:#fff;font:600 22px Inter,sans-serif;padding:16px 22px;border-radius:14px;background:rgba(20,20,20,.85);border:1px solid rgba(255,255,255,.18);
+    box-shadow:0 20px 60px rgba(0,0,0,.45);pointer-events:auto;cursor:grab}
+
+  #back-btn{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    z-index:40;width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.25);
+    background:rgba(0,0,0,.6);color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.35);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    opacity:0;pointer-events:none;transition:opacity .35s ease, transform .25s ease;
+  }
+  #back-btn:hover{ transform:translateX(-50%) scale(1.05); }
+  #back-btn.show{ opacity:1; pointer-events:auto; }
+</style>
+</head>
+<body>
+  <div id="start-overlay">Click anywhere to start</div>
+  <div class="hint">Wheel: roll · Left drag: 3D pull · Right drag/Shift+drag: pan · Alt+Wheel: text depth</div>
+
+  <canvas id="gl"></canvas>
+  <canvas id="hud"></canvas>
+
+  <div id="p5-container"></div>
+
+  <div id="choice-ui" aria-modal="true" role="dialog">
+    <div id="choice-card">
+      <h3>What would you like to see?</h3>
+      <div class="row">
+        <button id="btn-schedule" class="btn champ" type="button">Schedule</button>
+        <button id="btn-eta" class="btn" type="button">ETA</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="volume-ui" role="region" aria-label="Waterfall sound">
+    <label for="volRange">Waterfall</label>
+    <input id="volRange" type="range" min="0" max="100" step="1" aria-label="Waterfall volume">
+    <span class="val" id="volVal">22%</span>
+    <button id="muteBtn" aria-label="Mute/Unmute">Mute</button>
+  </div>
+
+  <div id="breath-ui" role="region" aria-label="Breath guide">
+    <div class="row">
+      <div id="breath-phase">Inhale</div>
+      <div id="breath-time">00:04</div>
+    </div>
+    <div id="breath-progress"><div class="bar"></div></div>
+    <div id="breath-tip">Breathe gently — let your shoulders drop.</div>
+  </div>
+
+  <div id="rest-cta" aria-modal="true" role="dialog">
+    <div class="card">
+      <h4>Switch to rest mode?</h4>
+      <button id="rest-cta-btn" type="button">Enter Rest Mode</button>
+      <div style="margin-top:8px;opacity:.7;font:12px Inter;">(You can also click anywhere)</div>
+    </div>
+  </div>
+
+  <div id="final-msg"><div class="box">Stress reduced by 22%</div></div>
+
+  <button id="back-btn" aria-label="Back to start" title="Back to start">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v4l-4-4 4-4v4a7 7 0 1 1-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <script>
+    /* ---------- GLOBALS ---------- */
+    const HOLD_MS=2000;
+    let FINAL_FREEZE=false;
+    let FINAL_MODE=false;
+
+    // speak(): cancel previous speech before starting new one
+    const speak=(text,lang='en-US',rate=1,pitch=1,volume=1)=>{
+      try{
+        speechSynthesis.cancel();
+        const u=new SpeechSynthesisUtterance(text);
+        u.lang=lang;u.rate=rate;u.pitch=pitch;u.volume=volume;
+        speechSynthesis.speak(u);
+        return u;
+      }catch(e){return{onend:null}}
+    };
+
+    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    const setHUDVisible=show=>{
+      document.getElementById('hud').style.display=show?'block':'none';
+      const hint=document.querySelector('.hint');
+      if(hint){
+        hint.textContent='Wheel: roll · Left drag: 3D pull · Right drag/Shift+drag: pan · Alt+Wheel: text depth';
+        hint.style.display=show?'block':'none';
+      }
+    };
+    const showChoice=(show)=>{document.getElementById('choice-ui').style.display=show?'grid':'none';};
+
+    /* ---------- Waterfall audio ---------- */
+    let waterfallAudio=null;
+    const WATERFALL_DEFAULT_VOL=0.22, WATERFALL_MAX_VOL=0.35, VOL_STORE_KEY='wf_vol_v1';
+    let currentTargetVol=clamp(Number(localStorage.getItem(VOL_STORE_KEY)??WATERFALL_DEFAULT_VOL),0,WATERFALL_MAX_VOL);
+
+    function fadeVolume(audio,from,to,ms,onEnd){
+      const s=performance.now();
+      (function step(){
+        const t=Math.min(1,(performance.now()-s)/ms);
+        audio.volume=from+(to-from)*t;
+        if(t<1)requestAnimationFrame(step);else onEnd&&onEnd();
+      })();
+    }
+    function startWaterfallSfx(){
+      if(!waterfallAudio){
+        waterfallAudio=new Audio('waterfall.mp3'); // make sure this file exists next to HTML
+        waterfallAudio.loop=true;
+        waterfallAudio.volume=0;
+      }
+      waterfallAudio.currentTime=0;
+      waterfallAudio.play().catch(()=>{});
+      fadeVolume(waterfallAudio,0.0,currentTargetVol,1600);
+      showVolumeUI(true);
+      updateVolumeUI();
+    }
+    function stopWaterfallSfx(){
+      if(!waterfallAudio)return;
+      fadeVolume(
+        waterfallAudio,
+        waterfallAudio.volume,
+        0.0,
+        800,
+        ()=>waterfallAudio.pause()
+      );
+      showVolumeUI(false);
+    }
+    document.addEventListener('visibilitychange',()=>{
+      if(!waterfallAudio)return;
+      if(document.hidden){
+        fadeVolume(waterfallAudio,waterfallAudio.volume,0.0,300);
+      }else{
+        fadeVolume(waterfallAudio,waterfallAudio.volume,currentTargetVol,600);
+      }
+    });
+
+    const volUI=document.getElementById('volume-ui'),
+          volRange=document.getElementById('volRange'),
+          volVal=document.getElementById('volVal'),
+          muteBtn=document.getElementById('muteBtn');
+
+    function showVolumeUI(show){volUI.style.display=show?'block':'none'}
+    function updateVolumeUI(){
+      volRange.value=Math.round(currentTargetVol*100);
+      volVal.textContent=`${Math.round(currentTargetVol*100)}%`;
+      muteBtn.textContent=(waterfallAudio&&waterfallAudio.volume>0)?'Mute':'Unmute';
+    }
+    volRange.addEventListener('input',()=>{
+      currentTargetVol=clamp(Number(volRange.value)/100,0,WATERFALL_MAX_VOL);
+      localStorage.setItem(VOL_STORE_KEY,String(currentTargetVol));
+      if(waterfallAudio)waterfallAudio.volume=currentTargetVol;
+      updateVolumeUI();
+    });
+    muteBtn.addEventListener('click',()=>{
+      if(!waterfallAudio)return;
+      waterfallAudio.volume=waterfallAudio.volume>0?0:currentTargetVol;
+      updateVolumeUI();
+    });
+
+    /* ---------- THREE.js ---------- */
+    const glCanvas=document.getElementById('gl');
+    const renderer=new THREE.WebGLRenderer({canvas:glCanvas,antialias:true});
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,2000);
+    camera.position.z=500;
+    renderer.setSize(innerWidth,innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    renderer.setClearColor(0x000000);
+
+    const particlesGroup = new THREE.Group();
+    scene.add(particlesGroup);
+
+    const hudCanvas=document.getElementById('hud');
+    const hud=hudCanvas.getContext('2d');
+    function resizeHUD(){hudCanvas.width=innerWidth;hudCanvas.height=innerHeight}
+    resizeHUD();
+
+    let stressLevel=0,targetStress=0;
+    const lerp=(a,b,t)=>a+(b-a)*t;
+    const stressColor=x=>x<0.5?'#2ecc71':(x<0.75?'#f1c40f':'#e74c3c');
+
+    const particleCount=5000;
+    const particles=[],velocities=[],textPositions=[];
+    let phase='sphere',reformProgress=0;
+
+    /* sparkle control */
+    let centerSparkle=false;
+
+    function enterStressCenterSparkle(){
+      centerSparkle=true;
+      phase='reform';
+      reformProgress=0;
+      targetRot.x=0;
+      targetRot.y=0;
+    }
+    function exitCenterSparkle(){
+      centerSparkle=false;
+      FINAL_MODE=false;
+      for(const p of particles){p.scale.set(1,1,1)}
+    }
+
+    /* --- Roll & Pull (항상 활성) --- */
+    let rollX=0, rollVel=0; // wheel roll with inertia
+    let pullActive=false, pullPos=new THREE.Vector2(0,0), pullStrength=0;
+    const PULL_MAX_DZ=140, PULL_SIGMA=140;
+
+    const _tmpNDC=new THREE.Vector3(), _rayA=new THREE.Vector3(), _rayB=new THREE.Vector3();
+    function screenToWorldOnZ0(clientX,clientY){
+      _tmpNDC.set((clientX/innerWidth)*2-1, -(clientY/innerHeight)*2+1, 0.5);
+      _rayA.copy(camera.position);
+      _rayB.copy(_tmpNDC).unproject(camera);
+      const dir=_rayB.sub(_rayA).normalize();
+      const t=(0-_rayA.z)/dir.z;
+      return _rayA.clone().add(dir.multiplyScalar(t));
+    }
+    function computePullDZForTarget(worldX,worldY,strength=1.0){
+      const pullW=screenToWorldOnZ0(pullPos.x,pullPos.y);
+      const dx=worldX-pullW.x, dy=worldY-pullW.y;
+      const r2=dx*dx+dy*dy, g=Math.exp(-r2/(2*PULL_SIGMA*PULL_SIGMA));
+      return PULL_MAX_DZ*strength*g;
+    }
+
+    /* Text → particle targets */
+    function buildTextPositionsFrom(lines,{width=900,height=260,font='bold 60px Inter, Arial',lineHeight=76,align='center',scale=0.8}={}){
+      const c=document.createElement('canvas'),ctx=c.getContext('2d');c.width=width;c.height=height;
+      ctx.fillStyle='#fff';ctx.font=font;ctx.textAlign=align;ctx.textBaseline='top';
+      const cx=align==='left'?0:(width/2);let y=0;
+      for(const s of lines){ctx.fillText(s,cx,y);y+=lineHeight}
+      const img=ctx.getImageData(0,0,width,height),pos=[];
+      for(let py=0;py<height;py+=2){
+        for(let px=0;px<width;px+=2){
+          const a=img.data[(py*width+px)*4+3];
+          if(a>128)pos.push({x:(px-width/2)*scale,y:-(py-height/2)*scale,z:0});
+        }
+      }
+      return pos;
+    }
+    function applyTextPositionsToTargets(raw){
+      const need=particles.length,have=raw.length;
+      let mapped=[];
+      if(have===0){
+        mapped=new Array(need).fill({x:0,y:0,z:0})
+      }else if(have>need){
+        const stride=have/need;mapped=new Array(need);
+        for(let i=0;i<need;i++)mapped[i]=raw[Math.floor(i*stride)]
+      }else if(have<need){
+        mapped=new Array(need);
+        for(let i=0;i<need;i++)mapped[i]=raw[i%have]
+      }else{
+        mapped=raw;
+      }
+      for(let i=0;i<need;i++){
+        const r=mapped[i];
+        textPositions[i].set(r.x,r.y,r.z)
+      }
+    }
+
+    /* sparkle messages */
+    function showSparkleMessage(lines, {width=1000, height=240, font='bold 60px Inter, Arial', lineHeight=78, scale=0.9, duration=3000} = {}) {
+      const raw = buildTextPositionsFrom(lines, { width, height, font, lineHeight, align:'center', scale });
+      applyTextPositionsToTargets(raw);
+      enterStressCenterSparkle();
+      setTimeout(()=>{
+        exitCenterSparkle();
+        phase='scatter';
+      }, duration);
+    }
+
+    /* Back icon */
+    function showBackIcon(){
+      const b=document.getElementById('back-btn');
+      if(!b)return;
+      b.classList.add('show');
+      const go=()=>location.reload();
+      b.onclick=go;
+      window.addEventListener('keydown',e=>{
+        if(e.key==='Enter'||e.key===' ')go();
+      },{once:true});
+    }
+    function hideBackIcon(){
+      const b=document.getElementById('back-btn');
+      if(!b)return;
+      b.classList.remove('show');
+      b.onclick=null;
+    }
+
+    /* FINAL message */
+    function showFinalMessage(lines=['Stress reduced','by 22%']){
+      const host=document.getElementById('p5-container');
+      if(host){
+        try{if(p5Instance&&typeof p5Instance.remove==='function')p5Instance.remove();}catch(e){}
+        host.classList.remove('show');
+        host.style.display='none';
+        host.innerHTML='';
+      }
+
+      const gl=document.getElementById('gl'), hudEl=document.getElementById('hud');
+      if(gl)gl.style.display='block';
+      if(hudEl)hudEl.style.display='none';
+
+      hideBackIcon();
+      exitCenterSparkle();
+      FINAL_FREEZE=false; // will override just below for clarity, keep logic clean
+
+      // Reset transforms so final text sits centered
+      rollX=0; rollVel=0;
+      particlesGroup.position.set(0,0,0);
+      particlesGroup.rotation.set(0,0,0);
+      scene.position.set(0,0,0);
+      scene.rotation.set(0,0,0);
+      camera.position.set(0,0,500);
+      targetRot.x=targetRot.y=0;
+      camRot.x=camRot.y=0;
+
+      for(const m of particles){
+        m.visible=true;
+        m.material.opacity=1;
+        m.material.transparent=true;
+        m.material.blending=THREE.NormalBlending;
+        m.material.color.setRGB(1,1,1);
+        m.material.needsUpdate=true;
+        if(Math.abs(m.position.x)>5000||Math.abs(m.position.y)>5000||Math.abs(m.position.z)>5000){
+          m.position.set(0,0,0);
+        }
+      }
+
+      const raw=buildTextPositionsFrom(lines,{
+        width:920,height:320,font:'800 68px Inter, Arial',lineHeight:100,align:'center',scale:0.88
+      });
+      applyTextPositionsToTargets(raw);
+      if(raw.length===0){
+        setTimeout(()=>{
+          const r2=buildTextPositionsFrom(lines,{
+            width:920,height:320,font:'800 68px Arial',lineHeight:100,align:'center',scale:0.88
+          });
+          applyTextPositionsToTargets(r2);
+        },50);
+      }
+      enterStressCenterSparkle();
+
+      // lock sparkle so it's stable, and mark final freeze so click reload works
+      FINAL_MODE = true;
+      FINAL_FREEZE = true;
+
+      speak('Stress reduced by twenty two percent.','en-US',1,1);
+      setTimeout(()=>showBackIcon(),4000);
+    }
+
+    /* Stress detected → sparkle 텍스트 4초 유지 */
+    function runStressDetectedSequence(next){
+      speak('Stress detected.','en-US',1,1);
+      showSparkleMessage(
+        ['Stress detected'],
+        {width:1200,height:280,font:'800 76px Inter, Arial',lineHeight:96,scale:1.0,duration:4000}
+      );
+      setTimeout(()=>{next&&next();},4000);
+    }
+
+    /* initial welcome text */
+    function randomPointOnSphere(r){
+      const u=Math.random(),v=Math.random();
+      const th=2*Math.PI*u,ph=Math.acos(2*v-1);
+      return new THREE.Vector3(
+        r*Math.sin(ph)*Math.cos(th),
+        r*Math.sin(ph)*Math.sin(th),
+        r*Math.cos(ph)
+      );
+    }
+    function createTextParticles(){
+      const c=document.createElement('canvas'),ctx=c.getContext('2d');
+      c.width=800;c.height=300;
+      ctx.fillStyle='#fff';ctx.font='bold 60px Inter, Arial';ctx.textAlign='center';
+      ctx.fillText('Welcome back,',400,100);
+      ctx.fillText('Destiny',400,180);
+      const img=ctx.getImageData(0,0,c.width,c.height),pos=[];
+      for(let y=0;y<c.height;y+=2){
+        for(let x=0;x<c.width;x+=2){
+          const a=img.data[(y*c.width+x)*4+3];
+          if(a>128){
+            pos.push({
+              x:(x-c.width/2)*0.8,
+              y:-(y-c.height/2)*0.8,
+              z:0
+            });
+          }
+        }
+      }
+      return pos;
+    }
+    const initialText=createTextParticles();
+
+    let schedulePositions=[];
+    function createSchedulePositions(){
+      const c=document.createElement('canvas'),ctx=c.getContext('2d');
+      c.width=1300;c.height=520;
+      ctx.fillStyle='#fff';ctx.font='bold 40px Inter, Arial';ctx.textAlign='left';ctx.textBaseline='top';
+      const PAD_X=50,Y1=90,Y2=165,Y3=240;
+      ctx.fillText('Meeting With G. Chen - 11:30 AM',PAD_X,Y1);
+      ctx.fillText('Client Presentation - 11:00 AM',PAD_X,Y2);
+      ctx.fillText('Phone Call with Sara - 1:15 PM',PAD_X,Y3);
+      const img=ctx.getImageData(0,0,c.width,c.height),pos=[];
+      for(let y=2;y<c.height-2;y+=2){
+        for(let x=2;x<c.width-2;x+=2){
+          const a=img.data[(y*c.width+x)*4+3];
+          if(a>128){
+            pos.push({
+              x:(x-c.width/2)*0.6,
+              y:-(y-c.height/2)*0.6,
+              z:0
+            });
+          }
+        }
+      }
+      // normalize count vs particles.length:
+      const need=particles.length,have=pos.length;
+      if(have===0){schedulePositions=[];return;}
+      if(have>need){
+        const stride=have/need;const down=new Array(need);
+        for(let i=0;i<need;i++)down[i]=pos[Math.floor(i*stride)];
+        schedulePositions=down;
+      }else if(have<need){
+        const up=new Array(need);
+        for(let i=0;i<need;i++)up[i]=pos[i%have];
+        schedulePositions=up;
+      }else{
+        schedulePositions=pos;
+      }
+    }
+
+    /* particles creation */
+    const geo=new THREE.SphereGeometry(0.5,6,6);
+    const baseMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1});
+    for(let i=0;i<particleCount;i++){
+      const p=randomPointOnSphere(200);
+      const m=new THREE.Mesh(geo,baseMat.clone());
+      m.position.copy(p);
+      particles.push(m);
+      particlesGroup.add(m);
+      const v=p.clone().normalize().multiplyScalar(Math.random()*3+2);
+      velocities.push(v);
+
+      if(i<initialText.length){
+        textPositions.push(new THREE.Vector3(
+          initialText[i].x,
+          initialText[i].y,
+          initialText[i].z
+        ));
+      }else{
+        const r=initialText[Math.floor(Math.random()*initialText.length)];
+        textPositions.push(new THREE.Vector3(
+          r.x+(Math.random()-0.5)*100,
+          r.y+(Math.random()-0.5)*100,
+          r.z+(Math.random()-0.5)*50
+        ));
+      }
+    }
+
+    /* mouse: pull / pan / wheel roll / alt depth */
+    let isPanning=false, panStart={x:0,y:0}, sceneBasePos=new THREE.Vector3(0,0,0);
+    let targetRot={x:0,y:0},camRot={x:0,y:0}; // keep for smooth cam orientation
+
+    glCanvas.addEventListener('mousedown',(e)=>{
+      // Left click = pull
+      if(e.button===0 && !e.altKey && !e.ctrlKey && !e.shiftKey){
+        pullActive=true;
+        pullStrength=1.0;
+        pullPos.set(e.clientX,e.clientY);
+        document.body.style.cursor='grabbing';
+        e.preventDefault();
+        return;
+      }
+      // Pan: right click or Shift+left
+      if((e.button===2)||(e.button===0 && e.shiftKey)){
+        isPanning=true;
+        panStart.x=e.clientX;
+        panStart.y=e.clientY;
+        document.body.style.cursor='move';
+        e.preventDefault();
+        return;
+      }
+    },{passive:false});
+
+    window.addEventListener('mousemove', (e)=>{
+      if(pullActive){
+        pullPos.set(e.clientX,e.clientY);
+        return;
+      }
+      if(isPanning){
+        const dx=e.clientX-panStart.x, dy=e.clientY-panStart.y;
+        const panFactor=0.6;
+        scene.position.x=sceneBasePos.x+dx*panFactor;
+        scene.position.y=sceneBasePos.y-dy*panFactor;
+        return;
+      }
+    });
+
+    window.addEventListener('mouseup', ()=>{
+      if(pullActive){
+        pullActive=false;
+        pullStrength=0;
+        document.body.style.cursor='default';
+        return;
+      }
+      if(isPanning){
+        isPanning=false;
+        sceneBasePos.copy(scene.position);
+        document.body.style.cursor='default';
+        return;
+      }
+    });
+
+    glCanvas.addEventListener('contextmenu', (e)=>e.preventDefault());
+
+    // Wheel = roll, Alt+Wheel = depth
+    glCanvas.addEventListener('wheel', (e)=>{
+      if(e.altKey){
+        e.preventDefault();
+        particlesGroup.position.z=clamp(
+          particlesGroup.position.z+e.deltaY*0.5,
+          -1500,1500
+        );
+        return;
+      }
+      e.preventDefault();
+      rollVel += -e.deltaY*0.001; // scroll down => rotate right
+    },{passive:false});
+
+    glCanvas.addEventListener('dblclick', ()=>{
+      particlesGroup.position.set(0,0,0);
+      particlesGroup.rotation.set(0,0,0);
+      rollX=0; rollVel=0;
+    });
+
+    /* Rest CTA */
+    const restCta=document.getElementById('rest-cta');
+    const restBtn=document.getElementById('rest-cta-btn');
+    function showRestCTA(show){restCta.style.display=show?'grid':'none'}
+    let awaitingRestClick=false;
+    if(restBtn){
+      restBtn.addEventListener('click',()=>{
+        if(!awaitingRestClick)return;
+        awaitingRestClick=false;
+        showRestCTA(false);
+        setTimeout(()=>enterP5Waterfall(),HOLD_MS);
+      });
+    }
+
+    /* clicks / global click */
+    let hasStarted=false;
+    document.body.addEventListener('click',()=>{
+      if(FINAL_FREEZE){
+        location.reload();
+        return;
+      }
+      if(!hasStarted){
+        hasStarted=true;
+        const ov=document.getElementById('start-overlay');
+        if(ov){
+          ov.style.opacity='0';
+          setTimeout(()=>ov.style.display='none',500);
+        }
+        document.body.style.cursor='default';
+        startAnimation();
+        return;
+      }
+      if(awaitingRestClick){
+        awaitingRestClick=false;
+        showRestCTA(false);
+        setTimeout(()=>enterP5Waterfall(),HOLD_MS);
+      }
+    });
+
+    window.addEventListener('keydown',e=>{
+      if(!awaitingRestClick)return;
+      if(e.key==='Enter'||e.key===' '){
+        awaitingRestClick=false;
+        showRestCTA(false);
+        setTimeout(()=>enterP5Waterfall(),HOLD_MS);
+      }
+    });
+
+    /* FLOW */
+    function startAnimation(){
+      setTimeout(()=>{phase='explode';},2000);
+      setTimeout(()=>{phase='reform';},5000);
+
+      setTimeout(()=>{
+        const u=speak('Welcome back, Destiny.','en-US',0.95,1);
+        u.onend=()=>{
+          setTimeout(()=>{
+            speak('Would you like to see your schedule or ETA?','en-US',1,1);
+            showChoice(true);
+          },HOLD_MS);
+        };
+      },5000+HOLD_MS);
+    }
+
+    document.getElementById('btn-schedule').addEventListener('click',()=>{
+      showChoice(false);
+      speak('Okay. I will show your schedule.','en-US',1,1);
+      setTimeout(()=>showSchedule(),2000);
+    });
+
+    document.getElementById('btn-eta').addEventListener('click',()=>{
+      showChoice(false);
+      speak('Okay. Showing ETA.','en-US',1,1);
+      setTimeout(()=>enterP5ETA(),600);
+    });
+
+    function showSchedule(){
+      phase='scatter';
+      setTimeout(()=>{
+        phase='schedule';
+        reformProgress=0;
+        createSchedulePositions();
+      },200);
+
+      setTimeout(()=>{
+        setTimeout(()=>{
+          phase='scatter';
+          setTimeout(()=>{
+            setHUDVisible(true);
+            startStressRamp(()=>{
+              setTimeout(()=>askRestMode(),HOLD_MS);
+            });
+          },HOLD_MS);
+        },HOLD_MS);
+      },5000);
+    }
+
+    function startStressRamp(onDone){
+      const rampDur=6000,rampTo=0.86,start=performance.now(),from=stressLevel;
+      (function step(){
+        const t=Math.min(1,(performance.now()-start)/rampDur);
+        targetStress=from+(rampTo-from)*t;
+        if(t<1)requestAnimationFrame(step);else onDone&&onDone();
+      })();
+    }
+
+    function askRestMode(){
+      speak('It seems your stress is elevated. Would you like to switch to a rest mode for a moment?','en-US',1,1);
+      awaitingRestClick=true;
+      showRestCTA(true);
+      const hint=document.querySelector('.hint');
+      if(hint){
+        hint.textContent='Click to enter rest mode (waterfall)';
+        hint.style.display='block';
+      }
+    }
+
+    function drawStressBar(){
+      if(hudCanvas.style.display==='none')return;
+      hud.clearRect(0,0,hudCanvas.width,hudCanvas.height);
+
+      stressLevel=lerp(stressLevel,targetStress,0.02);
+
+      const barH=hudCanvas.height*0.35,
+            barW=14,
+            x=60,
+            y=(hudCanvas.height-barH)/2;
+
+      hud.fillStyle='rgba(255,255,255,0.15)';
+      roundRect(hud,x,y,barW,barH,5);hud.fill();
+
+      const h=barH*stressLevel,col=stressColor(stressLevel);
+      hud.fillStyle=col;
+      roundRect(hud,x,y+barH-h,barW,h,5);hud.fill();
+
+      hud.textAlign='center';
+      hud.font='12px Inter, Arial';
+      hud.fillStyle='#fff';
+      hud.fillText('STRESS',x+barW/2,y-8);
+
+      hud.font='600 14px Inter, Arial';
+      hud.fillStyle=col;
+      hud.fillText(`${Math.round(stressLevel*100)}%`,x+barW/2,y+barH+18);
+
+      hud.strokeStyle='rgba(255,255,255,0.25)';
+      hud.lineWidth=1;
+      [0.25,0.5,0.75].forEach(v=>{
+        const yy=y+barH-barH*v;
+        hud.beginPath();
+        hud.moveTo(x-6,yy);
+        hud.lineTo(x+barW+6,yy);
+        hud.stroke();
+      });
+    }
+    function roundRect(ctx,x,y,w,h,r){
+      ctx.beginPath();
+      ctx.moveTo(x+r,y);
+      ctx.arcTo(x+w,y,x+w,y+h,r);
+      ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r);
+      ctx.arcTo(x,y,x+w,y,r);
+      ctx.closePath();
+    }
+
+    let time=0;
+    function animate(){
+      if (FINAL_FREEZE) {
+        renderer.render(scene, camera);
+        return;
+      }
+      requestAnimationFrame(animate);
+      time+=0.002;
+
+      const k=0.12;
+      camRot.x+=(targetRot.x-camRot.x)*k;
+      camRot.y+=(targetRot.y-camRot.y)*k;
+
+      drawStressBar();
+
+      // roll inertia
+      rollX += rollVel;
+      rollVel *= 0.94;
+      if (Math.abs(rollVel) < 0.0002) rollVel = 0;
+      particlesGroup.position.x = rollX * 120;
+      particlesGroup.rotation.z = rollX * 0.35;
+
+      if(phase==='sphere'){
+        scene.rotation.y=time+camRot.y;
+        scene.rotation.x=time*0.75+camRot.x;
+        for(const p of particles){
+          if (pullActive || pullStrength>0.001){
+            const wx = particlesGroup.position.x + p.position.x;
+            const wy = particlesGroup.position.y + p.position.y;
+            const dz = computePullDZForTarget(wx, wy, pullStrength);
+            p.position.z += (dz - p.position.z) * 0.03;
+          }
+          const b=THREE.MathUtils.mapLinear(p.position.y,-200,200,0.4,1.0);
+          p.material.color.setRGB(b,b,b);
+        }
+
+      }else if(phase==='explode'){
+        scene.rotation.y=time+camRot.y;
+        scene.rotation.x=time*0.75+camRot.x;
+        for(let i=0;i<particles.length;i++){
+          const p=particles[i];
+          p.position.add(velocities[i]);
+          if (pullActive || pullStrength>0.001){
+            const wx = particlesGroup.position.x + p.position.x;
+            const wy = particlesGroup.position.y + p.position.y;
+            const dz = computePullDZForTarget(wx, wy, pullStrength);
+            p.position.z += (dz - p.position.z) * 0.03;
+          }
+          const b=THREE.MathUtils.mapLinear(p.position.y,-200,200,0.4,1.0);
+          p.material.color.setRGB(b,b,b);
+        }
+
+      }else if(phase==='reform'){
+        scene.rotation.y=camRot.y;
+        scene.rotation.x=camRot.x;
+        reformProgress+=0.008;
+
+        let pullW=null;
+        if(pullActive||pullStrength>0.001) pullW=screenToWorldOnZ0(pullPos.x,pullPos.y);
+
+        for(let i=0;i<particles.length;i++){
+          const p=particles[i],tPos=textPositions[i];
+          let tx=tPos.x, ty=tPos.y, tz=tPos.z;
+          if(pullW){
+            const worldX = particlesGroup.position.x + tx;
+            const worldY = particlesGroup.position.y + ty;
+            tz += computePullDZForTarget(worldX, worldY, pullStrength);
+          }
+          p.position.x+=(tx - p.position.x)*0.03;
+          p.position.y+=(ty - p.position.y)*0.03;
+          p.position.z+=(tz - p.position.z)*0.03;
+          const b=Math.min(1,reformProgress);
+          p.material.color.setRGB(b,b,b);
+        }
+        if(!pullActive) pullStrength *= 0.90;
+
+      }else if(phase==='scatter'){
+        scene.rotation.y=camRot.y;
+        scene.rotation.x=camRot.x;
+        for(const p of particles){
+          p.position.add(new THREE.Vector3(
+            (Math.random()-0.5)*5,
+            (Math.random()-0.5)*5,
+            (Math.random()-0.5)*5
+          ));
+          if (pullActive || pullStrength>0.001){
+            const wx = particlesGroup.position.x + p.position.x;
+            const wy = particlesGroup.position.y + p.position.y;
+            const dz = computePullDZForTarget(wx, wy, pullStrength);
+            p.position.z += (dz - p.position.z) * 0.03;
+          }
+        }
+
+      }else if(phase==='schedule'){
+        scene.rotation.y=camRot.y;
+        scene.rotation.x=camRot.x;
+        reformProgress+=0.008;
+
+        let pullW=null;
+        if(pullActive||pullStrength>0.001) pullW=screenToWorldOnZ0(pullPos.x,pullPos.y);
+
+        for(let i=0;i<particles.length;i++){
+          const p=particles[i];
+          const base=(i<schedulePositions.length)
+            ? new THREE.Vector3(
+                schedulePositions[i].x,
+                schedulePositions[i].y,
+                schedulePositions[i].z
+              )
+            : new THREE.Vector3(
+                (Math.random()-0.5)*2000,
+                (Math.random()-0.5)*2000,
+                -1000
+              );
+
+          let tx=base.x, ty=base.y, tz=base.z;
+          if(pullW && i<schedulePositions.length){
+            const worldX = particlesGroup.position.x + tx;
+            const worldY = particlesGroup.position.y + ty;
+            tz += computePullDZForTarget(worldX, worldY, pullStrength);
+          }
+
+          p.position.x+=(tx - p.position.x)*0.03;
+          p.position.y+=(ty - p.position.y)*0.03;
+          p.position.z+=(tz - p.position.z)*0.03;
+
+          const b=Math.min(1,reformProgress);
+          p.material.color.setRGB(b,b,b);
+        }
+        if(!pullActive) pullStrength *= 0.90;
+      }
+
+      if(centerSparkle){
+        const tw=performance.now()*0.0015;
+        const amp = FINAL_MODE ? 0.0 : 0.08;
+        for(let i=0;i<particles.length;i++){
+          const p=particles[i];
+          const ph=(i*0.618)+tw;
+          if (amp>0){
+            p.position.x+=Math.sin(ph)*amp;
+            p.position.y+=Math.cos(ph*1.3)*amp;
+          }
+          p.material.opacity = FINAL_MODE
+            ? 1
+            : (0.45+0.55*(0.5+0.5*Math.sin(ph*2.3)));
+        }
+      }else{
+        for(const p of particles)p.material.opacity=1;
+      }
+
+      renderer.render(scene,camera);
+    }
+    animate();
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      resizeHUD();
+
+      // if user resizes during schedule view, rebuild the layout targets
+      if (phase === 'schedule') {
+        createSchedulePositions();
+      }
+    });
+
+    /* ---------- p5 SHARED INSTANCE ---------- */
+    let p5Instance = null;
+
+    /* ---------- Waterfall (p5) ---------- */
+    function enterP5Waterfall(){
+      exitCenterSparkle();
+      glCanvas.style.display='none';
+      hudCanvas.style.display='none';
+      const hint=document.querySelector('.hint');
+      if(hint)hint.style.display='none';
+
+      const host=document.getElementById('p5-container');
+      host.classList.remove('show');
+      host.style.display='grid';
+      host.innerHTML='';
+      requestAnimationFrame(()=>host.classList.add('show'));
+
+      startWaterfallSfx();
+
+      const sketch=(p)=>{
+        const PANEL_COUNT=4,PARTICLES_PER_PANEL=900,DRIFT_AMPL=0.16,DRIFT_NOISE=0.0012,
+              LANE_COUNT=24,LANE_PULL=0.02,TRAIL_ALPHA=35;
+        const DEPTH_RANGE=240,SIZE_NEAR=1.9,SIZE_FAR=1.2,SPEED_NEAR=1.15,SPEED_FAR=0.9,
+              BRIGHT_NEAR=235,BRIGHT_FAR=170,SPEED_MIN=2.8,SPEED_MAX=5.2;
+        let panelWidth,panelHeight,waterfallParticles=[],t=0,rotT=0;
+
+        p.setup=()=>{
+          p.createCanvas(p.windowWidth,p.windowHeight,p.WEBGL).parent(host);
+          p.noStroke();
+          p.background(0);
+          panelWidth=p.width/PANEL_COUNT;
+          panelHeight=Math.max(p.height*1.25,p.height*1.1);
+
+          for(let i=0;i<PANEL_COUNT;i++){
+            let arr=[];
+            for(let j=0;j<PARTICLES_PER_PANEL;j++){
+              arr.push({
+                u:p.random(-panelWidth/2,panelWidth/2),
+                v:p.random(-panelHeight/2,panelHeight/2),
+                z:p.random(-DEPTH_RANGE,DEPTH_RANGE),
+                baseSpeed:p.random(SPEED_MIN,SPEED_MAX),
+                seed:p.random(1000)
+              });
+            }
+            waterfallParticles.push(arr);
+          }
+        };
+
+        p.draw=()=>{
+          p.background(0,TRAIL_ALPHA);
+
+          const fov=p.PI/8;
+          const zBase=(p.height/2)/p.tan(fov/2)*2.0;
+          const zBreath=20*Math.sin(p.millis()/10000*p.TWO_PI);
+
+          p.perspective(fov,p.width/p.height,0.1,20000);
+          p.camera(0,0,zBase+zBreath,0,0,0,0,1,0);
+          p.ambientLight(255);
+          p.orbitControl(0.15,0.15,0.15);
+
+          rotT+=0.002;
+          p.rotateY(Math.sin(rotT)*0.03);
+
+          const startX=-p.width/2+panelWidth/2,
+                baseZ=-1200,
+                laneW=panelWidth/LANE_COUNT;
+          t+=DRIFT_NOISE;
+
+          for(let i=0;i<PANEL_COUNT;i++){
+            const xPanel=startX+i*panelWidth;
+            p.push();
+            p.translate(xPanel,0,baseZ);
+
+            for(let pt of waterfallParticles[i]){
+              const laneIdx=Math.round((pt.u+panelWidth/2)/laneW),
+                    laneCenter=laneIdx*laneW-panelWidth/2;
+
+              pt.u=p.lerp(pt.u,laneCenter,LANE_PULL);
+
+              const driftSin=Math.sin((pt.seed*5)+t*2.0)*DRIFT_AMPL*0.6;
+              const driftNoise=p.map(
+                p.noise((pt.u+pt.seed)/700+t,(pt.v-pt.seed)/700-t),
+                0,1,-DRIFT_AMPL,DRIFT_AMPL
+              )*0.4;
+              pt.u+=driftSin+driftNoise;
+
+              const depthN=p.map(pt.z,-DEPTH_RANGE,DEPTH_RANGE,0,1),
+                    size=p.lerp(SIZE_FAR,SIZE_NEAR,depthN),
+                    speedK=p.lerp(SPEED_FAR,SPEED_NEAR,depthN),
+                    bright=p.lerp(BRIGHT_FAR,BRIGHT_NEAR,depthN);
+
+              pt.v-=pt.baseSpeed*speedK;
+              if(pt.v<-panelHeight/2){
+                pt.v=panelHeight/2;
+                pt.u=p.random(-panelWidth/2,panelWidth/2);
+                pt.z=p.random(-DEPTH_RANGE,DEPTH_RANGE);
+              }
+
+              const alpha=p.lerp(140,255,depthN);
+              p.noStroke();
+              p.fill(bright,bright,bright,alpha);
+              p.push();
+              p.translate(pt.u,-pt.v,pt.z);
+              p.sphere(size);
+              p.pop();
+            }
+
+            p.pop();
+          }
+        };
+
+        p.windowResized=()=>{
+          p.resizeCanvas(p.windowWidth,p.windowHeight);
+          panelWidth=p.width/PANEL_COUNT;
+          panelHeight=Math.max(p.height*1.25,p.height*1.1);
+          let rebuild=[];
+          for(let i=0;i<PANEL_COUNT;i++){
+            let arr=[];
+            for(let j=0;j<PARTICLES_PER_PANEL;j++){
+              arr.push({
+                u:p.random(-panelWidth/2,panelWidth/2),
+                v:p.random(-panelHeight/2,panelHeight/2),
+                z:p.random(-DEPTH_RANGE,DEPTH_RANGE),
+                baseSpeed:p.random(SPEED_MIN,SPEED_MAX),
+                seed:p.random(1000)
+              });
+            }
+            rebuild.push(arr);
+          }
+          waterfallParticles=rebuild;
+        };
+      };
+
+      if(p5Instance&&typeof p5Instance.remove==='function'){
+        try{p5Instance.remove();}catch(e){}
+      }
+      p5Instance=new p5(sketch);
+
+      setTimeout(()=>{
+        speak("We’ll stay with the waterfall for about nine seconds, then switch to breath mode.","en-US",1,1);
+      },300);
+
+      setTimeout(()=>{
+        const u = speak('Switching to breath mode now.','en-US',1,1);
+        let switched=false;
+        u.onend=()=>{
+          if(!switched){
+            switched=true;
+            enterBreathMode();
+          }
+        };
+        setTimeout(()=>{
+          if(!switched){
+            switched=true;
+            enterBreathMode();
+          }
+        },1500);
+      },9000);
+    }
+
+    /* ---------- ETA (p5) ---------- */
+    function enterP5ETA(){
+      glCanvas.style.display='none';
+      hudCanvas.style.display='none';
+
+      const host=document.getElementById('p5-container');
+      host.classList.remove('show');
+      host.style.display='grid';
+      host.innerHTML='';
+      requestAnimationFrame(()=>host.classList.add('show'));
+
+      setTimeout(()=>{
+        speak('We will arrive home in about ten minutes.','en-US',1,1);
+      },400);
+
+      const sketch=(p)=>{
+        let pathPoints=[],
+            labels=["OFFICE","HOME","OFFICE","SAN FRANCISCO"],
+            times=["","8:35","9:45","12:45"];
+        let currentSpeed=200,targetSpeed=220,vehicleT=0,vehicleSpeed=0.002,etaEnded=false;
+        let startTime;const START_DELAY=1200;
+        let scale=1,groupW=900,groupH=260;
+
+        const ETA_Y_OFFSET_RATIO=-0.10;
+
+        let offsetX=0, offsetY=0,
+            draggingETA=false,
+            dragStartX=0, dragStartY=0,
+            baseOffsetX=0, baseOffsetY=0;
+
+        p.setup=()=>{
+          const baseW=1400,baseH=700;
+          scale=Math.min(
+            window.innerWidth*0.92/baseW,
+            window.innerHeight*0.78/baseH,
+            1
+          );
+          p.createCanvas(baseW*scale,baseH*scale).parent(host);
+          p.textFont('Inter');
+          startTime=p.millis()+START_DELAY;
+          computePathPoints();
+        };
+
+        p.windowResized=()=>{
+          const baseW=1400,baseH=700;
+          scale=Math.min(
+            window.innerWidth*0.92/baseW,
+            window.innerHeight*0.78/baseH,
+            1
+          );
+          p.resizeCanvas(baseW*scale,baseH*scale);
+          computePathPoints();
+        };
+
+        function computePathPoints(){
+          groupW=900*scale;
+          groupH=260*scale;
+          const originX=(p.width-groupW)/2,
+                originY=(p.height-groupH)/2;
+          const offsetYratio=p.height*ETA_Y_OFFSET_RATIO;
+          const yMid=originY+groupH/2+offsetYratio;
+          const x0=originX+40*scale,
+                x1=originX+300*scale,
+                x2=originX+600*scale,
+                x3=originX+860*scale;
+          pathPoints=[
+            p.createVector(x0,yMid+40*scale),
+            p.createVector(x1,yMid-20*scale),
+            p.createVector(x2,yMid+10*scale),
+            p.createVector(x3,yMid)
+          ];
+          // apply drag offsets
+          pathPoints=pathPoints.map(v=>p.createVector(v.x+offsetX,v.y+offsetY));
+        }
+
+        p.draw=()=>{
+          p.background(0);
+          if(p.millis()<startTime)return;
+
+          drawPath();
+          drawDashedLine(pathPoints[0],pathPoints[1]);
+          drawLineOffset(pathPoints[1],pathPoints[2],20*scale,15*scale);
+          drawLineOffset(pathPoints[2],pathPoints[3]);
+          drawNodes();
+
+          drawVehicle();
+          drawSpeedBar();
+          drawSpeedNumber();
+
+          if(!etaEnded && vehicleT>=1){
+            etaEnded=true;
+            setTimeout(()=>{
+              try{p.remove();}catch(e){}
+              host.classList.remove('show');
+              setTimeout(()=>{host.style.display='none';},300);
+
+              glCanvas.style.display='block';
+              hudCanvas.style.display='block';
+
+              runStressDetectedSequence(()=>{
+                setHUDVisible(true);
+                setTimeout(()=>{
+                  startStressRamp(()=>{
+                    setTimeout(()=>{ askRestMode(); }, HOLD_MS);
+                  });
+                }, 2000);
+              });
+
+            },600);
+          }
+        };
+
+        p.mousePressed=()=>{
+          draggingETA=true;
+          dragStartX=p.mouseX;
+          dragStartY=p.mouseY;
+          baseOffsetX=offsetX;
+          baseOffsetY=offsetY;
+        };
+        p.mouseDragged=()=>{
+          if(!draggingETA)return;
+          offsetX=baseOffsetX+(p.mouseX-dragStartX);
+          offsetY=baseOffsetY+(p.mouseY-dragStartY);
+          computePathPoints();
+        };
+        p.mouseReleased=()=>{
+          draggingETA=false;
+        };
+
+        function drawPath(){
+          p.stroke(255,180,120);
+          p.strokeWeight(2);
+          p.noFill();
+          p.beginShape();
+          p.curveVertex(pathPoints[0].x,pathPoints[0].y);
+          p.curveVertex(pathPoints[0].x,pathPoints[0].y);
+          p.curveVertex(pathPoints[1].x,pathPoints[1].y);
+          p.endShape();
+
+          p.beginShape();
+          p.curveVertex(pathPoints[2].x,pathPoints[2].y);
+          p.curveVertex(pathPoints[2].x,pathPoints[2].y);
+          p.curveVertex(pathPoints[3].x,pathPoints[3].y);
+          p.endShape();
+        }
+
+        function drawDashedLine(p1,p2){
+          let offset=15*scale;
+          let start=offsetPoint(p1,p2,offset);
+          let end=offsetPoint(p2,p1,offset);
+          let seg=5*scale;
+          let d=p5.Vector.dist(start,end);
+          let num=d/(seg*2);
+          let dir=p5.Vector.sub(end,start).normalize();
+
+          p.stroke(255,180,120);
+          p.strokeWeight(2);
+          for(let i=0;i<num;i++){
+            let a=p5.Vector.add(start,dir.copy().mult(i*seg*2));
+            let b=p5.Vector.add(start,dir.copy().mult(i*seg*2+seg));
+            p.line(a.x,a.y,b.x,b.y);
+          }
+        }
+
+        function drawLineOffset(p1,p2,offset1=15*scale,offset2=15*scale){
+          let start=offsetPoint(p1,p2,offset1);
+          let end=offsetPoint(p2,p1,offset2);
+          p.stroke(255,180,120);
+          p.strokeWeight(2);
+          p.line(start.x,start.y,end.x,end.y);
+        }
+
+        function drawNodes(){
+          for(let i=0;i<pathPoints.length;i++){
+            let pt=pathPoints[i];
+            let radius=labels[i]==="HOME"?16*scale:12*scale;
+            let pulse=1+0.06*Math.sin(p.millis()/600+i);
+
+            p.stroke(255,180,120);
+            p.strokeWeight(1.5);
+            p.noFill();
+            p.ellipse(pt.x,pt.y,radius*2.5*pulse);
+            p.strokeWeight(1);
+            p.ellipse(pt.x,pt.y,radius*2*pulse);
+
+            p.fill(30);
+            p.noStroke();
+            p.ellipse(pt.x,pt.y,radius*1.2*pulse);
+
+            p.fill(255);
+            p.textSize(14*scale);
+            p.textAlign(p.CENTER,p.CENTER);
+            p.text(labels[i],pt.x,pt.y+radius+25*scale);
+
+            if(times[i]!==""){
+              p.fill(200);
+              p.textSize(12*scale);
+              p.textAlign(p.CENTER,p.CENTER);
+              p.text(times[i],pt.x,pt.y+radius+42*scale);
+            }
+          }
+        }
+
+        function drawVehicle(){
+          let start=pathPoints[0],
+              end=pathPoints[1];
+          let x=p.lerp(start.x,end.x,vehicleT),
+              y=p.lerp(start.y,end.y,vehicleT);
+
+          p.noStroke();
+          p.fill(255,180,120,50);
+          p.ellipse(x,y+2*scale,18*scale,6*scale);
+          p.fill(255);
+          p.noStroke();
+          p.ellipse(x,y,14*scale);
+
+          if(vehicleT<1){
+            vehicleT+=vehicleSpeed;
+            currentSpeed=p.lerp(currentSpeed,targetSpeed,0.05);
+            if(p.frameCount%90===0){
+              targetSpeed=200+Math.floor(p.random(51));
+            }
+            if(vehicleT>=1){
+              vehicleT=1;
+              vehicleSpeed=0;
+              currentSpeed=0;
+            }
+          }
+        }
+
+        function drawSpeedBar(){
+          let cx=p.width/2,
+              cy=p.height-120*scale,
+              w=Math.min(500*scale,p.width*0.7),
+              h=20*scale;
+
+          let c1=p.color(80,150,255),
+              c2=p.color(255,160,60),
+              c3=p.color(255,80,80);
+
+          for(let i=0;i<w;i+=6*scale){
+            let ratio=i/w;
+            let col=ratio<0.5
+              ? p.lerpColor(c1,c2,p.map(ratio,0,0.5,0,1))
+              : p.lerpColor(c2,c3,p.map(ratio,0.5,1,0,1));
+            p.fill(col);
+            p.noStroke();
+            p.rect(cx-w/2+i,cy,4*scale,h,2*scale);
+          }
+
+          p.fill(255,100,100);
+          p.noStroke();
+          p.textSize(12*scale);
+          p.textAlign(p.CENTER,p.CENTER);
+          p.text('MAX',cx+w/2,cy-25*scale);
+
+          let norm=p.constrain(p.map(currentSpeed,0,250,0,1),0,1);
+          let ix=cx-w/2+norm*w;
+          p.fill(255);
+          p.noStroke();
+          p.ellipse(ix,cy-8*scale,12*scale,12*scale);
+        }
+
+        function drawSpeedNumber(){
+          let cx=p.width/2,
+              cy=p.height-120*scale,
+              h=20*scale;
+          p.fill(255);
+          p.textFont('Inter');
+          p.textAlign(p.CENTER,p.BOTTOM);
+          p.textSize(28*scale);
+          p.text(`${Math.floor(currentSpeed)} mph`,cx,cy-20*scale);
+
+          p.textSize(16*scale);
+          p.textAlign(p.CENTER,p.TOP);
+          p.text('LIGHTSPEED',cx,cy+h+30*scale);
+        }
+
+        function offsetPoint(from,to,dist){
+          return p5.Vector.add(
+            from,
+            p5.Vector.sub(to,from).normalize().mult(dist)
+          );
+        }
+      };
+
+      if(p5Instance&&typeof p5Instance.remove==='function'){
+        try{p5Instance.remove();}catch(e){}
+      }
+      p5Instance=new p5(sketch);
+    }
+
+    /* ---------- Breath (p5) + UI ---------- */
+    const breathUI={
+      root:document.getElementById('breath-ui'),
+      phase:document.getElementById('breath-phase'),
+      time:document.getElementById('breath-time'),
+      bar:document.querySelector('#breath-progress .bar'),
+      tip:document.getElementById('breath-tip'),
+      show(){this.root.style.display='block'},
+      hide(){this.root.style.display='none'},
+      update(phaseLabel,remaining,progress01){
+        this.phase.textContent=phaseLabel;
+        this.time.textContent=`00:${String(Math.max(0,remaining)).padStart(2,'0')}`;
+        this.bar.style.width=`${Math.max(0,Math.min(1,progress01))*100}%`;
+        const tipMap={
+          INHALE:'Inhale softly — expand through the ribs.',
+          EXHALE:'Exhale longer — relax your jaw.',
+          HOLD:'Hold — keep shoulders loose.'
+        };
+        this.tip.textContent=tipMap[phaseLabel]||'Breathe gently — let your shoulders drop.';
+      }
+    };
+
+    function positionBreathBox(outer=240,gap=28,offset=70){
+      const top=(window.innerHeight/2 - offset) + (outer/2) + gap;
+      breathUI.root.style.top=`${Math.round(top)}px`;
+      breathUI.root.style.left='50%';
+      breathUI.root.style.transform='translateX(-50%)';
+    }
+
+    function enterBreathMode(){
+      exitCenterSparkle();
+      stopWaterfallSfx();
+      showVolumeUI(false);
+
+      if(p5Instance && typeof p5Instance.remove==='function'){
+        try{ p5Instance.remove(); }catch(e){}
+      }
+      p5Instance=null;
+
+      const host=document.getElementById('p5-container');
+      host.classList.remove('show');
+      host.style.display='grid';
+      host.innerHTML='';
+      requestAnimationFrame(()=>host.classList.add('show'));
+
+      breathUI.show();
+      const CIRCLE_Y_OFFSET = 70;
+      positionBreathBox(240,28,CIRCLE_Y_OFFSET);
+
+      const sketch=(p)=>{
+        const DOT=1.2,RW=1.2,RA=90,ES=0.035,
+              WMIN=0.6,WMAX=1.2,SMIN=0.4,SMAX=0.9,N=2200;
+        let pts=[],startTime,spread=0,targetSpread=0,showIntro=true,introStart;
+        const phases=[
+          {type:"INHALE",duration:4},
+          {type:"HOLD",duration:3},
+          {type:"EXHALE",duration:4},
+          {type:"HOLD",duration:3},
+          {type:"INHALE",duration:4},
+          {type:"HOLD",duration:3},
+          {type:"EXHALE",duration:4}
+        ];
+        const total=25;
+        let idx=0,pStart=0;
+        const CIRCLE_Y_OFFSET_LOCAL = 70;
+
+        function isOverBreathBox(){
+          const box = document.getElementById('breath-ui');
+          if(!box) return false;
+          const r = box.getBoundingClientRect();
+          const x = p.winMouseX, y = p.winMouseY;
+          return (x>=r.left && x<=r.right && y>=r.top && y<=r.bottom);
+        }
+
+        let centerDX=0, centerDY=0,
+            draggingB=false,
+            bStartX=0, bStartY=0,
+            baseDX=0, baseDY=0;
+
+        p.setup=()=>{
+          p.createCanvas(p.windowWidth,p.windowHeight).parent(host);
+          p.noStroke();
+          p.textFont("Inter, Arial");
+          p.textAlign(p.CENTER,p.CENTER);
+
+          introStart=p.millis();
+          startTime=introStart+2000;
+
+          for(let i=0;i<N;i++){
+            const ang=p.random(p.TWO_PI),
+                  br=p.random(110,130),
+                  inO=p.random(-70,-30),
+                  outO=p.random(30,70),
+                  j1=p.random(1000),
+                  j2=p.random(1000),
+                  mag=p.random(WMIN,WMAX),
+                  spd=p.random(SMIN,SMAX);
+            pts.push({ang,br,inO,outO,j1,j2,mag,spd});
+          }
+
+          positionBreathBox(240,28,CIRCLE_Y_OFFSET_LOCAL);
+        };
+
+        p.draw=()=>{
+          p.background(0);
+
+          const now=p.millis();
+          if(showIntro){
+            const f=p.constrain(p.map(now,introStart,startTime,0,255),0,255);
+            p.fill(255,f);
+            p.textSize(22);
+            p.text(
+"A scan of your stress signals indicates the need for a guided breath.\nLet’s begin.",
+              p.width/2,p.height/2
+            );
+            if(now>=startTime)showIntro=false;
+            return;
+          }
+
+          const elapsed=(now-startTime)/1000;
+          if(elapsed>=total){
+            breathUI.hide();
+            try{p.remove();}catch(e){}
+            document.getElementById('gl').style.display='block';
+            document.getElementById('hud').style.display='none';
+            showFinalMessage(['Stress reduced','by 22%']);
+            return;
+          }
+
+          let ph=phases[idx];
+          let t=elapsed-pStart;
+          if(t>=ph.duration){
+            idx++;
+            if(idx>=phases.length){
+              breathUI.hide();
+              return;
+            }
+            pStart+=ph.duration;
+            t=0;
+            ph=phases[idx];
+          }
+
+          targetSpread=ph.type==="INHALE"?1:(ph.type==="EXHALE"?-1:0);
+          spread+=(targetSpread-spread)*ES;
+
+          const OUTER=240,INNER=160,
+                cx=p.width/2+centerDX,
+                cy=p.height/2 - CIRCLE_Y_OFFSET_LOCAL + centerDY,
+                tt=now/1000;
+
+          p.fill(255);
+          for(const q of pts){
+            const off=spread<0
+              ? p.lerp(0,q.inO,-spread)
+              : p.lerp(0,q.outO,spread);
+
+            const r=q.br+off;
+            const x=cx+r*Math.cos(q.ang),
+                  y=cy+r*Math.sin(q.ang);
+
+            const wx=Math.sin(tt*q.spd+q.j1)*q.mag,
+                  wy=Math.cos(tt*q.spd+q.j2)*q.mag;
+
+            p.ellipse(x+wx,y+wy,DOT,DOT);
+          }
+
+          p.noFill();
+          p.stroke(255,RA);
+          p.strokeWeight(RW);
+          p.ellipse(cx,cy,OUTER);
+          p.ellipse(cx,cy,INNER);
+
+          const remain=Math.ceil(ph.duration-t),
+                prog=Math.max(0,Math.min(1,t/ph.duration));
+          breathUI.update(ph.type,remain,prog);
+        };
+
+        p.mousePressed=()=>{
+          if (isOverBreathBox()) return;
+          draggingB=true;
+          bStartX=p.mouseX;
+          bStartY=p.mouseY;
+          baseDX=centerDX;
+          baseDY=centerDY;
+        };
+
+        p.mouseDragged=()=>{
+          if (!draggingB || isOverBreathBox()) return;
+          centerDX=baseDX+(p.mouseX-bStartX);
+          centerDY=baseDY+(p.mouseY-bStartY);
+        };
+
+        p.mouseReleased=()=>{
+          draggingB=false;
+        };
+
+        p.windowResized=()=>{
+          p.resizeCanvas(p.windowWidth,p.windowHeight);
+          positionBreathBox(240,28,CIRCLE_Y_OFFSET_LOCAL);
+        };
+      };
+
+      p5Instance=new p5(sketch);
+    }
+
+    /* ---------- Make DOM boxes draggable ---------- */
+    function makeDraggable(el,{handle=null,containment=true}={}){
+      if(!el) return;
+      el.style.position='fixed';
+      const h=handle?(typeof handle==='string'?el.querySelector(handle):handle):el;
+
+      let dragging=false,sx=0,sy=0,ox=0,oy=0;
+      const down=(e)=>{
+        const p=('touches'in e)?e.touches[0]:e;
+        e.stopPropagation();
+        e.preventDefault();
+        dragging=true;
+        sx=p.clientX;sy=p.clientY;
+        const r=el.getBoundingClientRect();
+        ox=r.left;oy=r.top;
+        document.body.style.userSelect='none';
+        el.style.cursor='grabbing';
+      };
+      const move=(e)=>{
+        if(!dragging)return;
+        const p=('touches'in e)?e.touches[0]:e;
+        let nx=ox+(p.clientX-sx),
+            ny=oy+(p.clientY-sy);
+        if(containment){
+          const maxX=innerWidth-el.offsetWidth,
+                maxY=innerHeight-el.offsetHeight;
+          nx=Math.max(0,Math.min(maxX,nx));
+          ny=Math.max(0,Math.min(maxY,ny));
+        }
+        el.style.left=nx+'px';
+        el.style.top=ny+'px';
+        el.style.transform='none';
+      };
+      const up=()=>{
+        dragging=false;
+        document.body.style.userSelect='';
+        el.style.cursor='';
+      };
+
+      h.style.cursor='grab';
+      h.addEventListener('mousedown',down);
+      window.addEventListener('mousemove',move);
+      window.addEventListener('mouseup',up);
+
+      h.addEventListener('touchstart',down,{passive:false});
+      window.addEventListener('touchmove',move,{passive:false});
+      window.addEventListener('touchend',up);
+    }
+
+    window.addEventListener('load', ()=>{
+      makeDraggable(document.getElementById('choice-card'));
+      makeDraggable(document.getElementById('volume-ui'));
+      makeDraggable(document.getElementById('breath-ui'));
+      makeDraggable(document.querySelector('#rest-cta .card'));
+      makeDraggable(document.querySelector('#final-msg .box'));
+      makeDraggable(document.getElementById('back-btn'));
+    });
+  </script>
+</body>
+</html>
